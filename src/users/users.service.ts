@@ -1,12 +1,11 @@
-import * as bcrypt from 'bcrypt';
 import { Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { CreateUserRequest } from './dto/create-user-request';
-import { PrismaService } from 'src/prisma/prisma.service';
-import { PrismaClient } from '@prisma/client';
-import * as fs from 'fs';
-import * as path from 'path';
 import { UpdateUserRequest } from './dto/update-user-request';
-// import { saveBase64Image } from 'utils/saveBase64Image';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { Prisma } from 'generated/prisma';
+import * as bcrypt from 'bcrypt';
+import * as path from 'path';
+import * as fs from 'fs';
 
 @Injectable()
 export class UsersService {
@@ -161,6 +160,10 @@ export class UsersService {
     }
   }
 
+  /**
+   * Update user profile image by userId
+   * @param data Partial<CreateUserRequest>
+   */
   async updateProfileImage(userId: string, data: Partial<CreateUserRequest>) {
     try {
       if (!data.profile_picture) {
@@ -211,5 +214,15 @@ export class UsersService {
         err.message || 'Error updating profile image',
       );
     }
+  }
+
+  /**
+   * Filter user by email
+   * @returns Object of users matching the criteria
+   */
+  async getEmailUser(filter: Prisma.usersWhereUniqueInput) {
+    return this.prismaService.users.findUniqueOrThrow({
+      where: filter,
+    });
   }
 }
