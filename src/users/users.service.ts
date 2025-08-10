@@ -3,13 +3,18 @@ import { CreateUserRequest } from './dto/create-user-request';
 import { UpdateUserRequest } from './dto/update-user-request';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Prisma } from 'generated/prisma';
+import * as nodemailer from 'nodemailer';
 import * as bcrypt from 'bcrypt';
 import * as path from 'path';
 import * as fs from 'fs';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly configService: ConfigService,
+  ) {}
 
   /**
    * Create user
@@ -18,7 +23,7 @@ export class UsersService {
    */
   async createUser(data: CreateUserRequest) {
     try {
-      return await this.prismaService.users.create({
+      const user = await this.prismaService.users.create({
         data: {
           ...data,
           password: await bcrypt.hash(data.password, 10),
@@ -33,6 +38,42 @@ export class UsersService {
           phone: true,
         },
       });
+
+      // After creating user
+      const verificationCode = Math.floor(
+        100000 + Math.random() * 900000,
+      ).toString();
+
+      await this.prismaService.usersVerification.create({
+        data: {
+          verification_code: verificationCode,
+          verification_code_expires: new Date(Date.now() + 1000 * 60 * 15),
+          is_verified: false,
+          user: {
+            connect: { id: user.id },
+          },
+        },
+      });
+
+      // Send Email with Mailtrap
+      var transporter = nodemailer.createTransport({
+        host: this.configService.getOrThrow('SMTP_HOST'),
+        port: this.configService.getOrThrow('SMTP_PORT'),
+        auth: {
+          user: this.configService.getOrThrow('SMTP_USERNAME'),
+          pass: this.configService.getOrThrow('SMTP_PASSWORD'),
+        },
+      });
+
+      await transporter.sendMail({
+        from: this.configService.getOrThrow('SMTP_FROM_EMAIL'),
+        to: user.email,
+        subject: 'Your Verification Code',
+        text: `Your verification code is: ${verificationCode}`,
+        html: `<p>Your verification code is: <b>${verificationCode}</b></p>`,
+      });
+
+      return user;
     } catch (err) {
       if (err.code === 'P2002') {
         if (err.meta && Array.isArray(err.meta.target)) {
@@ -220,9 +261,52 @@ export class UsersService {
    * Filter user by email
    * @returns Object of users matching the criteria
    */
-  async getEmailUser(filter: Prisma.usersWhereUniqueInput) {
+  async getEmailUser(filter: Prisma.UsersWhereUniqueInput) {
     return this.prismaService.users.findUniqueOrThrow({
       where: filter,
+    });
+  }
+
+  /**
+   * Filter user verification by unique input
+   * @returns Object of users verification matching the criteria
+   */
+  async getVerifyEmail(filter: Prisma.UsersVerificationWhereUniqueInput) {
+    try {
+      return await this.prismaService.usersVerification.findUniqueOrThrow({
+        where: filter,
+      });
+    } catch (error) {
+      if (error.code === 'P2025') {
+        throw new UnprocessableEntityException('Verification code not found');
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Verify user email by verification code
+   * @param verification_code string
+   */
+  async verifyEmail(verification_code: string) {
+    // Find the verification entry
+    const verification = await this.prismaService.usersVerification.findUnique({
+      where: { verification_code },
+      select: { user_id: true },
+    });
+
+    if (!verification) {
+      throw new UnprocessableEntityException('Invalid verification code');
+    }
+
+    // Update the verification entry and user
+    await this.prismaService.usersVerification.update({
+      where: { verification_code },
+      data: {
+        is_verified: true,
+        verification_code: null,
+        verification_code_expires: null,
+      },
     });
   }
 }

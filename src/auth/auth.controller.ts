@@ -1,10 +1,10 @@
 import { AuthService } from './auth.service';
 import { CurrentUser } from './current-user.decorator';
 import { LocalAuthGuard } from './guards/local-auth.guard';
-import { Controller, Post, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Post, Res, UseGuards } from '@nestjs/common';
 
 import type { Response } from 'express';
-import type { users } from 'generated/prisma';
+import type { Users } from 'generated/prisma';
 
 @Controller('auth')
 export class AuthController {
@@ -13,9 +13,14 @@ export class AuthController {
   @UseGuards(LocalAuthGuard)
   @Post('login')
   login(
-    @CurrentUser() user: users,
+    @CurrentUser() user: Users,
     @Res({ passthrough: true }) response: Response,
   ) {
     return this.authService.login(user, response);
+  }
+
+  @Post('verify-account')
+  verifyEmail(@Body('verification_code') verification_code: string) {
+    return this.authService.verifyAccount(verification_code);
   }
 }

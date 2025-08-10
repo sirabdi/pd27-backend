@@ -14,15 +14,34 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model users {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  nik       String   @unique
-  phone     String   @unique
-  address   String   @unique
-  password  String
-  profile_picture String 
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+model Users {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  name            String
+  nik             String   @unique
+  phone           String   @unique
+  address         String   @unique
+  password        String
+  profile_picture String
+  role            String   @default("user")
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  verification    UsersVerification?
+
+  @@map("user")
+}
+
+model UsersVerification {
+  id                        String    @id @default(cuid())
+  user_id                   String    @unique
+  verification_code         String?   @unique
+  verification_code_expires DateTime?
+  is_verified               Boolean   @default(false) 
+  created_at                DateTime  @default(now())
+  updated_at                DateTime  @updatedAt
+
+  user      Users    @relation(fields: [user_id], references: [id])
+
+  @@map("user_verification")
 }
