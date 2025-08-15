@@ -37,6 +37,8 @@ model UsersVerification {
   user_id                   String    @unique
   verification_code         String?   @unique
   verification_code_expires DateTime?
+  reset_password_token      String?   @unique
+  reset_password_expires    DateTime?
   is_verified               Boolean   @default(false) 
   created_at                DateTime  @default(now())
   updated_at                DateTime  @updatedAt

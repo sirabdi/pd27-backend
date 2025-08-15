@@ -2,12 +2,13 @@ import { Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { CreateUserRequest } from './dto/create-user-request';
 import { UpdateUserRequest } from './dto/update-user-request';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { ConfigService } from '@nestjs/config';
 import { Prisma } from 'generated/prisma';
 import * as nodemailer from 'nodemailer';
 import * as bcrypt from 'bcrypt';
 import * as path from 'path';
 import * as fs from 'fs';
-import { ConfigService } from '@nestjs/config';
+import ms from 'ms';
 
 @Injectable()
 export class UsersService {
@@ -47,7 +48,10 @@ export class UsersService {
       await this.prismaService.usersVerification.create({
         data: {
           verification_code: verificationCode,
-          verification_code_expires: new Date(Date.now() + 1000 * 60 * 15),
+          verification_code_expires: new Date(
+            Date.now() +
+              ms(this.configService.getOrThrow('VERIFICATION_CODE_EXPIRATION')),
+          ),
           is_verified: false,
           user: {
             connect: { id: user.id },
