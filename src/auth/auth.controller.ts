@@ -46,4 +46,20 @@ export class AuthController {
       confirmationNewPassword,
     );
   }
+
+  @Post('refresh-token')
+  async refreshToken(
+    @Body('refresh_token') refreshToken: string,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    return this.authService.refreshToken(refreshToken, response);
+  }
+
+  @Post('logout')
+  async logout(
+    @Body('user_id') userId: string,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    return this.authService.logout(userId, response);
+  }
 }

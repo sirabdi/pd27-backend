@@ -37,18 +37,30 @@ export class AuthService {
 
     const token = this.jwtService.sign(tokenPayload);
 
+    const payload = { sub: user.id, email: user.email };
+    const refreshToken = this.jwtService.sign(payload, {
+      expiresIn: '7d',
+      secret: process.env.JWT_REFRESH_SECRET,
+    });
+
     response.cookie('Authentication', token, {
       secure: true,
       httpOnly: true,
       expires,
     });
 
-    return { tokenPayload };
+    // Save refresh token to DB
+    await this.prismaService.users.update({
+      where: { id: user.id },
+      data: { refresh_token: refreshToken },
+    });
+
+    return { tokenPayload, refreshToken };
   }
 
   async verifyEmail(email: string, password: string) {
     try {
-      const user = await this.userService.getEmailUser({ email });
+      const user = await this.userService.getDatalUser({ email });
       const verification = await this.userService.getVerifyEmail({
         user_id: user.id,
       });
@@ -85,7 +97,7 @@ export class AuthService {
   }
 
   async resendVerifyAccount(email: string) {
-    const user = await this.userService.getEmailUser({ email });
+    const user = await this.userService.getDatalUser({ email });
 
     if (!user) {
       throw new UnprocessableEntityException('Email not found');
@@ -128,7 +140,7 @@ export class AuthService {
   }
 
   async forgotPassword(email: string) {
-    const user = await this.userService.getEmailUser({ email });
+    const user = await this.userService.getDatalUser({ email });
     if (!user) {
       throw new UnprocessableEntityException('Email not found');
     }
@@ -213,5 +225,75 @@ export class AuthService {
     });
 
     return { message: 'Password reset successful!' };
+  }
+
+  async refreshToken(refreshToken: string, response: Response) {
+    const user = await this.prismaService.users.findFirst({
+      where: { refresh_token: refreshToken },
+    });
+    if (!user) throw new UnauthorizedException('Invalid refresh token');
+
+    // Check if refresh token is expired
+    try {
+      this.jwtService.verify(refreshToken, {
+        secret: process.env.JWT_REFRESH_SECRET,
+      });
+    } catch (error) {
+      if (error.name === 'TokenExpiredError') {
+        throw new UnauthorizedException('Refresh token expired');
+      }
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const expires = new Date();
+    expires.setMilliseconds(
+      expires.getMilliseconds() +
+        ms(this.configService.getOrThrow('JWT_EXPIRATION')),
+    );
+
+    const tokenPayload: TokenPayload = {
+      userId: user.id,
+    };
+
+    const token = this.jwtService.sign(tokenPayload);
+
+    const payload = { sub: user.id, email: user.email };
+    const newRefreshToken = this.jwtService.sign(payload, {
+      expiresIn: '7d',
+      secret: process.env.JWT_REFRESH_SECRET,
+    });
+
+    response.cookie('Authentication', token, {
+      secure: true,
+      httpOnly: true,
+      expires,
+    });
+
+    // Save refresh token to DB
+    await this.prismaService.users.update({
+      where: { id: user.id },
+      data: { refresh_token: newRefreshToken },
+    });
+
+    return { tokenPayload, newRefreshToken };
+  }
+
+  async logout(userId: string, response: Response) {
+    await this.prismaService.users.update({
+      where: { id: userId },
+      data: { refresh_token: null },
+    });
+
+    await this.prismaService.usersVerification.delete({
+      where: { user_id: userId },
+    });
+
+    // Clear the authentication cookie
+    response.clearCookie('Authentication', {
+      httpOnly: true,
+      secure: true,
+    });
+
+    return { message: 'Logged out successfully' };
   }
 }

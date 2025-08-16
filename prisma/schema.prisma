@@ -24,6 +24,7 @@ model Users {
   password        String
   profile_picture String
   role            String   @default("user")
+  refresh_token   String?
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
 

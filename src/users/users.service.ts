@@ -265,7 +265,7 @@ export class UsersService {
    * Filter user by email
    * @returns Object of users matching the criteria
    */
-  async getEmailUser(filter: Prisma.UsersWhereUniqueInput) {
+  async getDatalUser(filter: Prisma.UsersWhereUniqueInput) {
     return this.prismaService.users.findUniqueOrThrow({
       where: filter,
     });

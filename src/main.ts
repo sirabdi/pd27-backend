@@ -1,11 +1,12 @@
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { json, urlencoded } from 'express';
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+import cookieParser from 'cookie-parser';
 import { Logger } from 'nestjs-pino';
 import { join } from 'path';
-import { NestExpressApplication } from '@nestjs/platform-express';
-import { json, urlencoded } from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -24,6 +25,7 @@ async function bootstrap() {
     next(err);
   });
 
+  app.use(cookieParser());
   app.useLogger(app.get(Logger));
   app.useStaticAssets(join(__dirname, '..', 'uploads'));
   app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
