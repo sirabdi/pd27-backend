@@ -3,6 +3,7 @@ import { CreateUserRequest } from './dto/create-user-request';
 import { UpdateUserRequest } from './dto/update-user-request';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
+import { sendMail } from 'src/utils/mail';
 import { Prisma } from 'generated/prisma';
 import * as nodemailer from 'nodemailer';
 import * as bcrypt from 'bcrypt';
@@ -60,17 +61,7 @@ export class UsersService {
       });
 
       // Send Email with Mailtrap
-      var transporter = nodemailer.createTransport({
-        host: this.configService.getOrThrow('SMTP_HOST'),
-        port: this.configService.getOrThrow('SMTP_PORT'),
-        auth: {
-          user: this.configService.getOrThrow('SMTP_USERNAME'),
-          pass: this.configService.getOrThrow('SMTP_PASSWORD'),
-        },
-      });
-
-      await transporter.sendMail({
-        from: this.configService.getOrThrow('SMTP_FROM_EMAIL'),
+      await sendMail({
         to: user.email,
         subject: 'Your Verification Code',
         text: `Your verification code is: ${verificationCode}`,

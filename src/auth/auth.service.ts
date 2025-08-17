@@ -3,7 +3,6 @@ import * as bcrypt from 'bcrypt';
 import { Response } from 'express';
 import { JwtService } from '@nestjs/jwt';
 import { Users } from 'generated/prisma';
-import * as nodemailer from 'nodemailer';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from 'src/users/users.service';
 import { TokenPayload } from './token-payload.interface';
@@ -14,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { randomBytes } from 'crypto';
+import { sendMail } from 'src/utils/mail';
 
 @Injectable()
 export class AuthService {
@@ -119,17 +119,7 @@ export class AuthService {
     });
 
     // Send Email with Mailtrap
-    var transporter = nodemailer.createTransport({
-      host: this.configService.getOrThrow('SMTP_HOST'),
-      port: this.configService.getOrThrow('SMTP_PORT'),
-      auth: {
-        user: this.configService.getOrThrow('SMTP_USERNAME'),
-        pass: this.configService.getOrThrow('SMTP_PASSWORD'),
-      },
-    });
-
-    await transporter.sendMail({
-      from: this.configService.getOrThrow('SMTP_FROM_EMAIL'),
+    await sendMail({
       to: user.email,
       subject: 'Your Verification Code',
       text: `Your verification code is: ${verificationCode}`,
@@ -158,20 +148,10 @@ export class AuthService {
       },
     });
 
-    // Send email with token (Mailtrap)
-    const transporter = nodemailer.createTransport({
-      host: this.configService.getOrThrow('SMTP_HOST'),
-      port: this.configService.getOrThrow('SMTP_PORT'),
-      auth: {
-        user: this.configService.getOrThrow('SMTP_USERNAME'),
-        pass: this.configService.getOrThrow('SMTP_PASSWORD'),
-      },
-    });
-
+    // Send Email with Mailtrap
     const resetUrl = `https://your-frontend.com/reset-password?token=${resetToken}`;
 
-    await transporter.sendMail({
-      from: this.configService.getOrThrow('SMTP_FROM_EMAIL'),
+    await sendMail({
       to: user.email,
       subject: 'Reset your password',
       text: `Reset your password using this link: ${resetUrl}`,
