@@ -30,6 +30,7 @@ export class UsersService {
           ...data,
           password: await bcrypt.hash(data.password, 10),
           profile_picture: '',
+          is_verified: false,
         },
         select: {
           id: true,
@@ -53,7 +54,6 @@ export class UsersService {
             Date.now() +
               ms(this.configService.getOrThrow('VERIFICATION_CODE_EXPIRATION')),
           ),
-          is_verified: false,
           user: {
             connect: { id: user.id },
           },
@@ -256,7 +256,7 @@ export class UsersService {
    * Filter user by email
    * @returns Object of users matching the criteria
    */
-  async getDatalUser(filter: Prisma.UsersWhereUniqueInput) {
+  async getDatailUser(filter: Prisma.UsersWhereUniqueInput) {
     return this.prismaService.users.findUniqueOrThrow({
       where: filter,
     });
@@ -295,12 +295,18 @@ export class UsersService {
     }
 
     // Update the verification entry and user
-    await this.prismaService.usersVerification.update({
+    const verifiedUserId = await this.prismaService.usersVerification.update({
       where: { verification_code },
       data: {
-        is_verified: true,
         verification_code: null,
         verification_code_expires: null,
+      },
+    });
+
+    await this.prismaService.users.update({
+      where: { id: verifiedUserId.user_id },
+      data: {
+        is_verified: true,
       },
     });
   }

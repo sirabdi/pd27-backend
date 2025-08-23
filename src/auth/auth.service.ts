@@ -50,9 +50,8 @@ export class AuthService {
     });
 
     // Save refresh token to DB
-    await this.prismaService.users.update({
-      where: { id: user.id },
-      data: { refresh_token: refreshToken },
+    await this.prismaService.refreshToken.create({
+      data: { user_id: user.id, token: refreshToken },
     });
 
     return { tokenPayload, refreshToken };
@@ -60,13 +59,10 @@ export class AuthService {
 
   async verifyEmail(email: string, password: string) {
     try {
-      const user = await this.userService.getDatalUser({ email });
-      const verification = await this.userService.getVerifyEmail({
-        user_id: user.id,
-      });
+      const user = await this.userService.getDatailUser({ email });
 
       // Check if user is verified/active
-      if (verification && verification.is_verified === false) {
+      if (user && user.is_verified === false) {
         throw new UnauthorizedException('Credentials are not valid!');
       }
 
@@ -91,15 +87,19 @@ export class AuthService {
       user.verification_code_expires > new Date()
     ) {
       await this.userService.verifyEmail(verification_code);
+      await this.prismaService.usersVerification.delete({
+        where: { id: user.id },
+      });
       return { message: 'Account verified!' };
     }
     throw new UnprocessableEntityException('Invalid or expired code');
   }
 
   async resendVerifyAccount(email: string) {
-    const user = await this.userService.getDatalUser({ email });
-
-    if (!user) {
+    let user;
+    try {
+      user = await this.userService.getDatailUser({ email });
+    } catch (error) {
       throw new UnprocessableEntityException('Email not found');
     }
 
@@ -108,7 +108,7 @@ export class AuthService {
     ).toString();
 
     await this.prismaService.usersVerification.update({
-      where: { id: user.id },
+      where: { user_id: user.id },
       data: {
         verification_code: verificationCode,
         verification_code_expires: new Date(
@@ -130,25 +130,26 @@ export class AuthService {
   }
 
   async forgotPassword(email: string) {
-    const user = await this.userService.getDatalUser({ email });
+    const user = await this.userService.getDatailUser({ email });
     if (!user) {
       throw new UnprocessableEntityException('Email not found');
     }
 
-    // Generate token and expiry
+    // // Generate token and expiry
     const resetToken = randomBytes(32).toString('hex');
     const resetExpires = new Date(Date.now() + ms('15m')); // 15 minutes
+    console.log('user ', user);
 
     // Save to user
-    await this.prismaService.usersVerification.update({
-      where: { user_id: user.id },
+    await this.prismaService.resetPasswordToken.create({
       data: {
+        user_id: user.id,
         reset_password_token: resetToken,
         reset_password_expires: resetExpires,
       },
     });
 
-    // Send Email with Mailtrap
+    // // Send Email with Mailtrap
     const resetUrl = `https://your-frontend.com/reset-password?token=${resetToken}`;
 
     await sendMail({
@@ -173,7 +174,7 @@ export class AuthService {
     }
 
     // Find user by token and check expiry
-    const user = await this.prismaService.usersVerification.findFirst({
+    const user = await this.prismaService.resetPasswordToken.findFirst({
       where: {
         reset_password_token: token,
         reset_password_expires: { gt: new Date() },
@@ -196,22 +197,18 @@ export class AuthService {
     });
 
     // Clear and reset field
-    await this.prismaService.usersVerification.update({
+    await this.prismaService.resetPasswordToken.delete({
       where: { user_id: user.user_id },
-      data: {
-        reset_password_token: null,
-        reset_password_expires: null,
-      },
     });
 
     return { message: 'Password reset successful!' };
   }
 
   async refreshToken(refreshToken: string, response: Response) {
-    const user = await this.prismaService.users.findFirst({
-      where: { refresh_token: refreshToken },
+    const userToken = await this.prismaService.refreshToken.findFirst({
+      where: { token: refreshToken },
     });
-    if (!user) throw new UnauthorizedException('Invalid refresh token');
+    if (!userToken) throw new UnauthorizedException('Invalid refresh token');
 
     // Check if refresh token is expired
     try {
@@ -232,12 +229,16 @@ export class AuthService {
     );
 
     const tokenPayload: TokenPayload = {
-      userId: user.id,
+      userId: userToken.user_id,
     };
 
     const token = this.jwtService.sign(tokenPayload);
 
-    const payload = { sub: user.id, email: user.email };
+    const user = await this.prismaService.users.findUnique({
+      where: { id: userToken.user_id },
+    });
+
+    const payload = { sub: userToken.user_id, email: user?.email };
     const newRefreshToken = this.jwtService.sign(payload, {
       expiresIn: '7d',
       secret: process.env.JWT_REFRESH_SECRET,
@@ -250,21 +251,16 @@ export class AuthService {
     });
 
     // Save refresh token to DB
-    await this.prismaService.users.update({
-      where: { id: user.id },
-      data: { refresh_token: newRefreshToken },
+    await this.prismaService.refreshToken.update({
+      where: { user_id: userToken.user_id },
+      data: { token: newRefreshToken },
     });
 
     return { tokenPayload, newRefreshToken };
   }
 
   async logout(userId: string, response: Response) {
-    await this.prismaService.users.update({
-      where: { id: userId },
-      data: { refresh_token: null },
-    });
-
-    await this.prismaService.usersVerification.delete({
+    await this.prismaService.refreshToken.delete({
       where: { user_id: userId },
     });
 

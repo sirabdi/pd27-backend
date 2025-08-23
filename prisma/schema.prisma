@@ -24,13 +24,15 @@ model Users {
   password        String
   profile_picture String
   role            String   @default("user")
-  refresh_token   String?
+  is_verified     Boolean  @default(false)
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
 
-  verification    UsersVerification?
+  verification       UsersVerification?
+  RefreshToken       RefreshToken?
+  ResetPasswordToken ResetPasswordToken?
 
-  @@map("user")
+  @@map("users")
 }
 
 model UsersVerification {
@@ -38,13 +40,35 @@ model UsersVerification {
   user_id                   String    @unique
   verification_code         String?   @unique
   verification_code_expires DateTime?
-  reset_password_token      String?   @unique
-  reset_password_expires    DateTime?
-  is_verified               Boolean   @default(false) 
   created_at                DateTime  @default(now())
   updated_at                DateTime  @updatedAt
 
-  user      Users    @relation(fields: [user_id], references: [id])
+  user Users @relation(fields: [user_id], references: [id])
 
   @@map("user_verification")
+}
+
+model RefreshToken {
+  id         String   @id @default(cuid())
+  user_id    String   @unique
+  token      String   @unique
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  user Users @relation(fields: [user_id], references: [id])
+
+  @@map("user_refresh_token")
+}
+
+model ResetPasswordToken {
+  id                     String    @id @default(cuid())
+  user_id                String    @unique
+  reset_password_token   String?
+  reset_password_expires DateTime?
+  created_at             DateTime  @default(now())
+  updated_at             DateTime  @updatedAt
+
+  user Users @relation(fields: [user_id], references: [id])
+
+  @@map("user_reset_password_token")
 }

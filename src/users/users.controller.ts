@@ -23,7 +23,7 @@ export class UsersController {
   @Get(':userId')
   @UseGuards(JwtAuthGuard)
   async getProduct(@Param('userId') userId: string) {
-    return this.userService.getDatalUser({ id: userId });
+    return this.userService.getDatailUser({ id: userId });
   }
 
   @Put(':userId')
