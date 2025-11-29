@@ -106,12 +106,24 @@ export class UsersService {
   async getUsers(params?: {
     skip?: number;
     take?: number;
+    page?: number;
     search?: string;
     address?: string;
     orderBy?: { field: 'createdDate' | 'name'; direction: 'asc' | 'desc' };
   }) {
-    const { skip, take, search, address, orderBy } = params || {};
+    const {
+      skip = 0,
+      take = 10,
+      page = 1,
+      search,
+      address,
+      orderBy,
+    } = params || {};
     const where: any = {};
+
+    // Get total count
+    const total = await this.prismaService.users.count({ where });
+
     if (search) {
       where.name = { contains: search, mode: 'insensitive' };
     }
@@ -122,12 +134,31 @@ export class UsersService {
     if (orderBy) {
       order[orderBy.field] = orderBy.direction;
     }
-    return this.prismaService.users.findMany({
+
+    const data = await this.prismaService.users.findMany({
       where,
       skip,
       take,
       orderBy: orderBy ? order : undefined,
     });
+
+    // Calculate metadata
+    const totalPages = Math.ceil(total / take);
+    const currentPage = page;
+    const hasNextPage = currentPage < totalPages;
+    const hasPreviousPage = currentPage > 1;
+
+    return {
+      data,
+      metadata: {
+        total,
+        page: currentPage,
+        limit: take,
+        totalPages,
+        hasNextPage,
+        hasPreviousPage,
+      },
+    };
   }
 
   /**

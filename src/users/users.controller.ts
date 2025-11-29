@@ -1,4 +1,4 @@
-import { Delete, UseGuards } from '@nestjs/common';
+import { Delete, Query, UseGuards } from '@nestjs/common';
 import { Body, Controller, Get, Param, Patch, Post, Put } from '@nestjs/common';
 import { CreateUserRequest } from './dto/create-user-request';
 import { UsersService } from './users.service';
@@ -19,8 +19,23 @@ export class UsersController {
 
   @Get()
   @UseGuards(JwtAuthGuard)
-  async getUsers() {
-    return await this.userService.getUsers();
+  async getUsers(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('address') address?: string,
+  ) {
+    const pageNum = parseInt(page || '1');
+    const limitNum = parseInt(limit || '10');
+    const skip = (pageNum - 1) * limitNum;
+
+    return await this.userService.getUsers({
+      skip,
+      take: limitNum,
+      page: pageNum,
+      search,
+      address,
+    });
   }
 
   @Get('user-profile')
