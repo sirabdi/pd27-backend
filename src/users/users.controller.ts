@@ -4,6 +4,9 @@ import { CreateUserRequest } from './dto/create-user-request';
 import { UsersService } from './users.service';
 import { UpdateUserRequest } from './dto/update-user-request';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { CurrentUser } from 'src/auth/current-user.decorator';
+
+import type { TokenPayload } from 'src/auth/token-payload.interface';
 
 @Controller('users')
 export class UsersController {
@@ -18,6 +21,12 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   async getUsers() {
     return await this.userService.getUsers();
+  }
+
+  @Get('user-profile')
+  @UseGuards(JwtAuthGuard)
+  async getUserProfile(@CurrentUser() user: TokenPayload) {
+    return this.userService.getDatailUser({ id: user.userId });
   }
 
   @Get(':userId')

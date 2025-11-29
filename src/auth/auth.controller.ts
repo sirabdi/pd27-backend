@@ -1,10 +1,12 @@
 import { AuthService } from './auth.service';
 import { CurrentUser } from './current-user.decorator';
 import { LocalAuthGuard } from './guards/local-auth.guard';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Body, Controller, Post, Res, UseGuards } from '@nestjs/common';
 
 import type { Response } from 'express';
 import type { Users } from 'generated/prisma';
+import type { TokenPayload } from './token-payload.interface';
 
 @Controller('auth')
 export class AuthController {
@@ -55,11 +57,12 @@ export class AuthController {
     return this.authService.refreshToken(refreshToken, response);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post('logout')
   async logout(
-    @Body('user_id') userId: string,
+    @CurrentUser() user: TokenPayload,
     @Res({ passthrough: true }) response: Response,
   ) {
-    return this.authService.logout(userId, response);
+    return this.authService.logout(user, response);
   }
 }

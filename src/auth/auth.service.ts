@@ -35,26 +35,33 @@ export class AuthService {
       userId: user.id,
     };
 
-    const token = this.jwtService.sign(tokenPayload);
+    const accessToken = this.jwtService.sign(tokenPayload);
 
-    const payload = { sub: user.id, email: user.email };
-    const refreshToken = this.jwtService.sign(payload, {
+    // Use consistent payload structure
+    const refreshTokenPayload = { userId: user.id };
+    const refreshToken = this.jwtService.sign(refreshTokenPayload, {
       expiresIn: '7d',
       secret: process.env.JWT_REFRESH_SECRET,
     });
 
-    response.cookie('Authentication', token, {
+    response.cookie('Authentication', accessToken, {
       secure: true,
       httpOnly: true,
       expires,
     });
 
-    // Save refresh token to DB
-    await this.prismaService.refreshToken.create({
-      data: { user_id: user.id, token: refreshToken },
+    // Use upsert to handle multiple logins
+    await this.prismaService.refreshToken.upsert({
+      where: { user_id: user.id },
+      update: { token: refreshToken },
+      create: { user_id: user.id, token: refreshToken },
     });
 
-    return { tokenPayload, refreshToken };
+    return {
+      accessToken,
+      refreshToken,
+      expiresIn: expires.toISOString(),
+    };
   }
 
   async verifyEmail(email: string, password: string) {
@@ -259,9 +266,9 @@ export class AuthService {
     return { tokenPayload, newRefreshToken };
   }
 
-  async logout(userId: string, response: Response) {
+  async logout(user: TokenPayload, response: Response) {
     await this.prismaService.refreshToken.delete({
-      where: { user_id: userId },
+      where: { user_id: user.userId },
     });
 
     // Clear the authentication cookie
